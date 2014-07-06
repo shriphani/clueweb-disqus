@@ -1,7 +1,9 @@
 (ns clueweb-disqus.core
   (:require [cheshire.core :refer :all]
             [clj-http.client :as client]
+            [clj-time.coerce :as c]
             [clj-time.core :as t]
+            [clj-time.format :as f]
             [clojure.java.io :as io])
   (:use [clojure.pprint :only [pprint]]))
 
@@ -35,6 +37,7 @@
             (-> credentials (get since-epoch) :api-key)
             "&since="
             since-epoch
+            "&order=asc"
             (if cursor (str "&cursor=" cursor) "")))))
 
 (defn rate-limited-download
@@ -45,22 +48,22 @@
             (swap! requests-in-session inc)
             (-> a-url client/get :body parse-string))
 
-        (and (< (t/in-minutes (t/duration @session-start-time t/now))
+        (and (< (t/in-minutes (t/interval @session-start-time (t/now)))
                 60)
              (> 1000 @requests-in-session))
         (do (swap! requests-in-session inc)
             (-> a-url client/get :body parse-string))
 
-        (and (< (t/in-minutes (t/duration @session-start-time t/now))
+        (and (< (t/in-minutes (t/interval @session-start-time (t/now)))
                 60)
              (<= 1000 @requests-in-session))
         (let [time-to-sleep (* 1000
                                (-
                                 3600
                                 (t/in-secs
-                                 (t/duration @session-start-time
+                                 (t/interval @session-start-time
                                              (t/now)))))]
-          (do (Thead/sleep time-to-sleep) ; sleep till the end of the
+          (do (Thread/sleep time-to-sleep) ; sleep till the end of the
                                           ; hour
                                           ; and then restart the session
               (swap! session-start-time (fn [x] (t/now)))
@@ -73,11 +76,26 @@
         filename-to-write (str start-epoch "-" writer-file-name)
         stats-f-to-write (str start-epoch "-" stats-file-name)]
     (do (with-open [wrtr (io/writer filename-to-write :append true)]
-          (pprint content-to-write wrtr))
+          (doall (doseq [c content-to-write]
+                   (pprint c wrtr))))
         (if (.exists (java.io.File. stats-f-to-write))
-          (let [count
-                (inc (read-string (slurp stats-f-to-write)))]
-            (spit stats-f-to-write count))))))
+          (let [cnt
+                (+ (read-string (slurp stats-f-to-write))
+                   (count content-to-write))]
+            (spit stats-f-to-write cnt))
+          (spit stats-f-to-write (count content-to-write))))))
+
+(defn stop-iteration?
+  [start-epoch page-response]
+  (let [credentials (load-credentials)
+        formatter   (f/formatters :date-hour-minute-second)]
+    (<= (-> credentials (get start-epoch) :stop Long/parseLong)
+        (try (-> (f/parse formatter
+                          (-> page-response last (get "createdAt")))
+                 c/to-long
+                 (/ 1000))
+             (catch Exception e (do (pprint (last page-response))
+                                    true)))))) ; stop anyway
 
 (defn discover-iteration
   [start-epoch first-page-content]
@@ -94,12 +112,13 @@
 
             next-pg-content (rate-limited-download next-pg-url)]
         (write-content start-epoch next-pg-content)
-        (recur start-epoch
-               next-pg-content)))))
+        (when-not (stop-iteration? start-epoch (get next-pg-content "response"))
+          (recur start-epoch
+                 next-pg-content))))))
 
 (defn threads-since
   [start-epoch]
   (let [request-url (create-url start-epoch)
         first-page  (rate-limited-download request-url)]
     (write-content start-epoch first-page)
-    (discover-iteration start-epoch first-page-content)))
+    (discover-iteration start-epoch first-page)))
