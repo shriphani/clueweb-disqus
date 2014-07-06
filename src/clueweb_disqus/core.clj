@@ -11,6 +11,8 @@
 (def clueweb-end-date-epoch "1336694400")
 
 (def writer-file-name (str "disqus-threads-" (t/now) ".clj"))
+(def stats-file-name (str "disqus-threads-" (t/now) ".stats")) ; dump
+                                                               ; download stats here
 
 (defn load-credentials
   []
@@ -68,9 +70,14 @@
 (defn write-content
   [start-epoch body]
   (let [content-to-write (get body "response")
-        filename-to-write (str start-epoch "-" writer-file-name)]
-    (with-open [wrtr (io/writer filename-to-write :append true)]
-      (pprint content-to-write wrtr))))
+        filename-to-write (str start-epoch "-" writer-file-name)
+        stats-f-to-write (str start-epoch "-" stats-file-name)]
+    (do (with-open [wrtr (io/writer filename-to-write :append true)]
+          (pprint content-to-write wrtr))
+        (if (.exists (java.io.File. stats-f-to-write))
+          (let [count
+                (inc (read-string (slurp stats-f-to-write)))]
+            (spit stats-f-to-write count))))))
 
 (defn discover-iteration
   [start-epoch first-page-content]
