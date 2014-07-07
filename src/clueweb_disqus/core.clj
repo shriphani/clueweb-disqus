@@ -46,6 +46,25 @@
                                    orig-epochs)))))))]
         (-> credentials (get correct-key) :api-key))))
 
+(defn get-stop-for-start-epoch
+  [credentials since-epoch]
+  (or (-> credentials (get since-epoch) :api-key)
+      (let [orig-epochs (keys credentials)
+            correct-key (str
+                         (first
+                          (last
+                           (sort-by
+                            first
+                            (filter
+                             (fn [[e d]]
+                               (pos? d))
+                             (map
+                              vector
+                              (map #(Long/parseLong %) orig-epochs)
+                              (map #(- since-epoch (Long/parseLong %))
+                                   orig-epochs)))))))]
+        (-> credentials (get correct-key) :stop Long/parseLong))))
+
 (defn create-url
   ([since-epoch]
      (create-url since-epoch nil))
@@ -59,19 +78,26 @@
             "&order=asc"
             (if cursor (str "&cursor=" cursor) "")))))
 
+(defn make-request
+  [a-url]
+  (try (-> a-url client/get :body parse-string)
+       (catch Exception e (do (Thread/sleep 3600000) ; sleep for 1 hr
+                                        ; and try again
+                              (make-request a-url)))))
+
 (defn rate-limited-download
   [a-url]
   (cond (nil? @session-start-time)
         (do (swap! session-start-time (fn [x] (t/now))) ; start
                                                                ; the clock
             (swap! requests-in-session inc)
-            (-> a-url client/get :body parse-string))
+            (make-request a-url))
 
         (and (< (t/in-minutes (t/interval @session-start-time (t/now)))
                 60)
              (> 1000 @requests-in-session))
         (do (swap! requests-in-session inc)
-            (-> a-url client/get :body parse-string))
+            (make-request a-url))
 
         (and (< (t/in-minutes (t/interval @session-start-time (t/now)))
                 60)
@@ -87,7 +113,7 @@
                                           ; and then restart the session
               (swap! session-start-time (fn [x] (t/now)))
               (swap! requests-in-session (fn [x] 1))
-              (-> a-url client/get :body parse-string)))))
+              (make-request a-url)))))
 
 (defn write-content
   [start-epoch body]
@@ -108,7 +134,7 @@
   [start-epoch page-response]
   (let [credentials (load-credentials)
         formatter   (f/formatters :date-hour-minute-second)]
-    (<= (-> credentials (get start-epoch) :stop Long/parseLong)
+    (<= (get-stop-for-start-epoch credentials (Long/parseLong start-epoch))
         (try (-> (f/parse formatter
                           (-> page-response last (get "createdAt")))
                  c/to-long
