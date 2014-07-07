@@ -8,3 +8,5 @@ pom.xml.asc
 /.lein-*
 /.nrepl-port
 credentials.clj
+*-disqus-threads-*.clj
+*-disqus-threads-*.stats
