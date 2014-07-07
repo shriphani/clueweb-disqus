@@ -27,6 +27,25 @@
 (def session-start-time (atom nil))
 (def requests-in-session (atom 0))
 
+(defn get-api-key-for-start-epoch
+  [credentials since-epoch]
+  (or (-> credentials (get since-epoch) :api-key)
+      (let [orig-epochs (keys credentials)
+            correct-key (str
+                         (first
+                          (last
+                           (sort-by
+                            first
+                            (filter
+                             (fn [[e d]]
+                               (pos? d))
+                             (map
+                              vector
+                              (map #(Long/parseLong %) orig-epochs)
+                              (map #(- since-epoch (Long/parseLong %))
+                                   orig-epochs)))))))]
+        (-> credentials (get correct-key) :api-key))))
+
 (defn create-url
   ([since-epoch]
      (create-url since-epoch nil))
@@ -34,7 +53,7 @@
      (let [credentials (load-credentials)]
        (str thread-request-url
             "?api_key="
-            (-> credentials (get since-epoch) :api-key)
+            (get-api-key-for-start-epoch credentials (Long/parseLong since-epoch))
             "&since="
             since-epoch
             "&order=asc"
@@ -122,3 +141,37 @@
         first-page  (rate-limited-download request-url)]
     (write-content start-epoch first-page)
     (discover-iteration start-epoch first-page)))
+
+(defn get-last-written-file
+  "There should be only 1 - newer files
+   have different start-epoch"
+  [start-epoch]
+  (first
+   (filter
+    (fn [x]
+      (and (re-find (re-pattern start-epoch)
+                    (.getAbsolutePath x))
+           (re-find #".clj$" (.getAbsolutePath x))))
+    (file-seq
+     (java.io.File. ".")))))
+
+(defn threads-since-recover
+  "Reads the existing records and restarts the crawl from the next timestamp
+   onwards"
+  [start-epoch]
+  (let [last-file (get-last-written-file start-epoch)
+        pb-rdr (-> last-file io/reader java.io.PushbackReader.)
+        records-stream (take-while
+                        identity
+                        (repeatedly (fn [] (try (read pb-rdr)
+                                               (catch Exception e nil)))))
+
+        last-record (last records-stream)
+
+        formatter (f/formatters :date-hour-minute-second)]
+    (threads-since
+     (str
+      (quot
+       (c/to-long
+        (f/parse formatter (get last-record "createdAt")))
+       1000)))))
