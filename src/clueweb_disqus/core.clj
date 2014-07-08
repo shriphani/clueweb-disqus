@@ -16,6 +16,8 @@
 (def stats-file-name (str "disqus-threads-" (t/now) ".stats")) ; dump
                                                                ; download stats here
 
+(def disqus-jobs-dir "/bos/tmp19/spalakod/clueweb12pp/disqus/")
+
 (defn load-credentials
   []
   (-> "credentials.clj"
@@ -160,12 +162,13 @@
             next-pg-content (rate-limited-download next-pg-url)]
         (write-content start-epoch next-pg-content)
         (cond (nil? (last (get next-pg-response "response")))
-              (threads-since (str (inc (Long/parseLong start-epoch)))) ; just don't bother and reboot the crawl
+              (threads-since (str (inc (Long/parseLong start-epoch)))) ; increment the pagination by 1
 
               (not
                (stop-iteration? start-epoch (get next-pg-content "response")))
               (recur start-epoch
-                     next-pg-content))))))
+                     next-pg-content)))
+      (println :finished-iterating))))
 
 (defn threads-since
   [start-epoch]
