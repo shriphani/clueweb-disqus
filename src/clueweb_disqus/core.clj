@@ -121,8 +121,8 @@
 (defn write-content
   [start-epoch body]
   (let [content-to-write (get body "response")
-        filename-to-write (str start-epoch "-" writer-file-name)
-        stats-f-to-write (str start-epoch "-" stats-file-name)]
+        filename-to-write (str disqus-jobs-dir start-epoch "-" writer-file-name)
+        stats-f-to-write (str disqus-jobs-dir start-epoch "-" stats-file-name)]
     (do (with-open [wrtr (io/writer filename-to-write :append true)]
           (doall (doseq [c content-to-write]
                    (pprint c wrtr))))
