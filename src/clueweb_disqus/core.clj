@@ -83,8 +83,9 @@
 (defn make-request
   [a-url]
   (try (-> a-url client/get :body parse-string)
-       (catch Exception e (do (Thread/sleep 3600000) ; sleep for 1 hr
-                                        ; and try again
+       (catch Exception e (do (Thread/sleep (* 60 60 1000)) ; sleep for 1 hr
+                                        ; and try again. this way the
+                                        ; system isn't so broken
                               (make-request a-url)))))
 
 (defn rate-limited-download
@@ -161,8 +162,9 @@
 
             next-pg-content (rate-limited-download next-pg-url)]
         (write-content start-epoch next-pg-content)
-        (cond (nil? (last (get next-pg-response "response")))
-              (threads-since (str (inc (Long/parseLong start-epoch)))) ; increment the pagination by 1
+        (cond (nil? (last (get next-pg-content "response")))
+              (do (Thread/sleep (* 5 60 1000)) ;; wait 5 mins and then retry
+                  (recur start-epoch first-page-content))
 
               (not
                (stop-iteration? start-epoch (get next-pg-content "response")))
@@ -188,7 +190,7 @@
                     (.getAbsolutePath x))
            (re-find #".clj$" (.getAbsolutePath x))))
     (file-seq
-     (java.io.File. ".")))))
+     (java.io.File. disqus-jobs-dir)))))
 
 (defn threads-since-recover
   "Reads the existing records and restarts the crawl from the next timestamp
