@@ -105,7 +105,7 @@
         (let [time-to-sleep (* 1000
                                (-
                                 3600
-                                (t/in-secs
+                                (t/in-seconds
                                  (t/interval @session-start-time
                                              (t/now)))))]
           (do (Thread/sleep time-to-sleep) ; sleep till the end of the
@@ -134,13 +134,15 @@
   [start-epoch page-response]
   (let [credentials (load-credentials)
         formatter   (f/formatters :date-hour-minute-second)]
-    (<= (get-stop-for-start-epoch credentials (Long/parseLong start-epoch))
-        (try (-> (f/parse formatter
-                          (-> page-response last (get "createdAt")))
-                 c/to-long
-                 (/ 1000))
-             (catch Exception e (do (pprint (last page-response))
-                                    true)))))) ; stop anyway
+    (try
+     (<= (get-stop-for-start-epoch credentials (Long/parseLong start-epoch))
+         (-> (f/parse formatter
+                      (-> page-response last (get "createdAt")))
+             c/to-long
+             (/ 1000)))
+     (catch Exception e (do (pprint (last page-response))
+                            (flush)
+                            true)))))              ; stop anyway
 
 (defn discover-iteration
   [start-epoch first-page-content]
