@@ -4,7 +4,8 @@
   (:require [clj-time.core :as t]
             [clj-time.coerce :as c]
             [clojure.java.io :as io])
-  (:use [incanter core stats charts io]))
+  (:use [clojure.pprint :only [pprint]]
+        [incanter core stats charts io]))
 
 (defn compute-downloaded-records
   []
@@ -22,7 +23,7 @@
   []
   (let [data-files (filter
                      (fn [f]
-                       (re-find #".clj$" (.getAbsolutePath f)))
+                       (re-find #".*-disqus-threads-.*.clj$" (.getAbsolutePath f)))
                      (file-seq (java.io.File. ".")))]
     (str
      "<html>"
@@ -38,7 +39,9 @@
                        (repeatedly
                         (fn [] (try (read rdr)
                                    (catch Exception e nil)))))]
-           (last stream)))
+           (let [w (java.io.StringWriter.)]
+             (pprint (last stream) w)
+             (.toString w))))
        data-files))
      "</pre>"
      "</body>"
@@ -58,4 +61,4 @@
             cnt (sel data :cols 1)]
         (save (time-series-plot dates cnt :y-label "Threads List Downloaded")
               "/bos/www/htdocs/spalakod/disqus/disqus_thread_list.png"))
-      (spit "disqus_samples.html" (generate-samples))))
+      (spit "/bos/www/htdocs/spalakod/disqus/disqus_samples.html" (generate-samples))))
