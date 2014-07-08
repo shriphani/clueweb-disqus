@@ -3,7 +3,8 @@
   (:gen-class :main true)
   (:require [clj-time.core :as t]
             [clj-time.coerce :as c]
-            [clojure.java.io :as io])
+            [clojure.java.io :as io]
+            [clueweb-disqus.core :as core])
   (:use [clojure.pprint :only [pprint]]
         [incanter core stats charts io]))
 
@@ -12,7 +13,7 @@
   (let [stats-files (filter
                      (fn [f]
                        (re-find #".stats$" (.getAbsolutePath f)))
-                     (file-seq (java.io.File. ".")))]
+                     (file-seq (java.io.File. core/disqus-jobs-dir)))]
     (reduce
      (fn [acc s]
        (+ acc (read-string (slurp s))))
@@ -24,7 +25,7 @@
   (let [data-files (filter
                      (fn [f]
                        (re-find #".*-disqus-threads-.*.clj$" (.getAbsolutePath f)))
-                     (file-seq (java.io.File. ".")))]
+                     (file-seq (java.io.File. core/disqus-jobs-dir)))]
     (str
      "<html>"
      "<body>"
