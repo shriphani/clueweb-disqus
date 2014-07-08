@@ -159,9 +159,13 @@
 
             next-pg-content (rate-limited-download next-pg-url)]
         (write-content start-epoch next-pg-content)
-        (when-not (stop-iteration? start-epoch (get next-pg-content "response"))
-          (recur start-epoch
-                 next-pg-content))))))
+        (cond (nil? (last (get next-pg-response "response")))
+              (threads-since (str (inc (Long/parseLong start-epoch)))) ; just don't bother and reboot the crawl
+
+              (not
+               (stop-iteration? start-epoch (get next-pg-content "response")))
+              (recur start-epoch
+                     next-pg-content))))))
 
 (defn threads-since
   [start-epoch]
