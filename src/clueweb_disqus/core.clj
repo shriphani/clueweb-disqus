@@ -18,6 +18,8 @@
 
 (def disqus-jobs-dir "/bos/tmp19/spalakod/clueweb12pp/disqus/")
 
+(def recovery-file (str disqus-jobs-dir "recover.clj"))
+
 (defn load-credentials
   []
   (-> "credentials.clj"
@@ -78,6 +80,7 @@
             "&since="
             since-epoch
             "&order=asc"
+            "&limit=100"
             (if cursor (str "&cursor=" cursor) "")))))
 
 (defn make-request
@@ -147,6 +150,13 @@
                             (flush)
                             true)))))              ; stop anyway
 
+(defn process-disqus-date
+  [a-date]
+  (let [formatter (f/formatters :date-hour-minute-second)]
+    (-> (f/parse formatter a-date)
+        c/to-long
+        (quot 1000))))
+
 (defn discover-iteration
   [start-epoch first-page-content]
   (let [next-pg-check (-> first-page-content
@@ -162,9 +172,17 @@
 
             next-pg-content (rate-limited-download next-pg-url)]
         (write-content start-epoch next-pg-content)
-        (cond (nil? (last (get next-pg-content "response")))
-              (do (Thread/sleep (* 5 60 1000)) ;; wait 5 mins and then retry
-                  (recur start-epoch first-page-content))
+        (cond (nil? (last (get next-pg-content "response"))) ; if nil,
+                                        ; even requerying was useless.
+                                        ; so we reboot the crawl
+              (do (println :diagnostic-stop :nil-returned)
+                  (spit recovery-file
+                        (-> first-page-content
+                            (get "response")
+                            last
+                            process-disqus-date)
+                        :append
+                        true))
 
               (not
                (stop-iteration? start-epoch (get next-pg-content "response")))
