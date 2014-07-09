@@ -3,9 +3,11 @@
   (:gen-class :main true)
   (:require [clojure.tools.cli :refer [parse-opts]]
             [clueweb-disqus.core :as core]
-            [clueweb-disqus.read-stats :as read-stats]))
+            [clueweb-disqus.read-stats :as read-stats]
+            [clueweb-disqus.recover :as recover]))
 
-(def options [["-r" "--recover TS" "Timestamp"]
+(def options [["-b" "-reboot" "Reboot the crawl"]
+              ["-r" "--recover TS" "Timestamp"]
               ["-s" "--stats" "Read stats"]])
 
 (defn -main
@@ -15,4 +17,7 @@
           (core/threads-since (:recover options))
 
           (:stats options)
-          (read-stats/-main))))
+          (read-stats/-main)
+
+          (:reboot options)
+          (recover/restart-to-recover-jobs))))
