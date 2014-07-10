@@ -158,6 +158,8 @@
         c/to-long
         (quot 1000))))
 
+(declare threads-since)
+
 (defn discover-iteration
   [start-epoch first-page-content]
   (let [next-pg-check (-> first-page-content
@@ -185,7 +187,13 @@
                             process-disqus-date
                             (str "\n"))
                         :append
-                        true))
+                        true)
+                  (threads-since (-> first-page-content
+                                     (get "response")
+                                     last
+                                     (get "createdAt")
+                                     process-disqus-date
+                                     str)))
 
               (not
                (stop-iteration? start-epoch (get next-pg-content "response")))
