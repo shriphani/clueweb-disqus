@@ -8,4 +8,4 @@ for line in $(cat $recovery_file);
 do
     nohup lein trampoline run -r $line &
 done
-rm $recovery_file
+mv $recovery_file recovered-$(date +%s)
