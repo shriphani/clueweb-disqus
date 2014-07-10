@@ -6,7 +6,7 @@
             [clueweb-disqus.read-stats :as read-stats]
             [clueweb-disqus.recover :as recover]))
 
-(def options [["-b" "-reboot" "Reboot the crawl"]
+(def options [["-b" "--reboot" "Reboot the crawl"]
               ["-r" "--recover TS" "Timestamp"]
               ["-s" "--stats" "Read stats"]])
 

@@ -33,7 +33,7 @@
 
 (defn get-api-key-for-start-epoch
   [credentials since-epoch]
-  (or (-> credentials (get since-epoch) :api-key)
+  (or (-> credentials (get (str since-epoch)) :api-key)
       (let [orig-epochs (keys credentials)
             correct-key (str
                          (first
@@ -52,7 +52,7 @@
 
 (defn get-stop-for-start-epoch
   [credentials since-epoch]
-  (or (-> credentials (get since-epoch) :api-key)
+  (or (-> credentials (get (str since-epoch)) :stop Long/parseLong)
       (let [orig-epochs (keys credentials)
             correct-key (str
                          (first
@@ -146,7 +146,8 @@
                       (-> page-response last (get "createdAt")))
              c/to-long
              (/ 1000)))
-     (catch Exception e (do (pprint (last page-response))
+     (catch Exception e (do (println (.getMessage e))
+                            (pprint (last page-response))
                             (flush)
                             true)))))              ; stop anyway
 
@@ -180,7 +181,9 @@
                         (-> first-page-content
                             (get "response")
                             last
-                            process-disqus-date)
+                            (get "createdAt")
+                            process-disqus-date
+                            (str "\n"))
                         :append
                         true))
 

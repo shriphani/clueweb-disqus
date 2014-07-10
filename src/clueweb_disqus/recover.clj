@@ -2,7 +2,8 @@
   "Module to restart crawls"
   (:require [clojure.string :as string]
             [clueweb-disqus.core :as core])
-  (:use [clojure.java.shell :only [sh]]))
+  (:use [clojure.java.shell :only [sh]])
+  (:import [java.lang ProcessBuilder]))
 
 (defn to-recover
   []
