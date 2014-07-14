@@ -3,12 +3,14 @@
   (:gen-class :main true)
   (:require [clojure.tools.cli :refer [parse-opts]]
             [clueweb-disqus.core :as core]
+            [clueweb-disqus.posts :as posts]
             [clueweb-disqus.read-stats :as read-stats]
             [clueweb-disqus.recover :as recover]))
 
 (def options [["-b" "--reboot" "Reboot the crawl"]
               ["-r" "--recover TS" "Timestamp"]
-              ["-s" "--stats" "Read stats"]])
+              ["-s" "--stats" "Read stats"]
+              ["-t" "--threads" "Dump a list of relevant thread-ids"]])
 
 (defn -main
   [& args]
@@ -20,4 +22,7 @@
           (read-stats/-main)
 
           (:reboot options)
-          (recover/restart-to-recover-jobs))))
+          (recover/restart-to-recover-jobs)
+
+          (:threads options)
+          (posts/dump-all-thread-ids core/disqus-jobs-dir))))

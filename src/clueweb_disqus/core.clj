@@ -29,7 +29,24 @@
 ;; 1000 requests allowed per hour
 
 (def session-start-time (atom nil))
+(def current-hour (atom (t/hour (t/now))))
 (def requests-in-session (atom 0))
+(def time-of-last-request (atom nil))
+
+(defn till-end-of-hour-minutes
+  "Measures the time remaining in milliseconds
+   for the current hour to end"
+  []
+  (let [current-time (t/now)]
+    (- 59 (t/minute current-time))))
+
+(defn till-end-of-hour-seconds
+  []
+  (* 60 (till-end-of-hour-minutes)))
+
+(defn till-end-of-hour-millis
+  []
+  (* 1000 (till-end-of-hour-seconds)))
 
 (defn get-api-key-for-start-epoch
   [credentials since-epoch]
@@ -85,41 +102,45 @@
 
 (defn make-request
   [a-url]
-  (try (-> a-url client/get :body parse-string)
-       (catch Exception e (do (Thread/sleep (* 60 60 1000)) ; sleep for 1 hr
-                                        ; and try again. this way the
-                                        ; system isn't so broken
-                              (make-request a-url)))))
+  (-> a-url client/get :body parse-string))
 
 (defn rate-limited-download
   [a-url]
   (cond (nil? @session-start-time)
         (do (swap! session-start-time (fn [x] (t/now))) ; start
-                                                               ; the clock
+                                        ; the clock
             (swap! requests-in-session inc)
+            (swap! time-of-last-request (fn [t] (t/now)))
             (make-request a-url))
 
-        (and (< (t/in-minutes (t/interval @session-start-time (t/now)))
-                60)
+        ;; if the hour changes, new session
+        (and (= (t/hour (t/now))
+                (t/hour @session-start-time))
              (> 1000 @requests-in-session))
         (do (swap! requests-in-session inc)
             (make-request a-url))
 
-        (and (< (t/in-minutes (t/interval @session-start-time (t/now)))
-                60)
+        (and (= (t/hour (t/now))
+                (t/hour @session-start-time))
              (<= 1000 @requests-in-session))
-        (let [time-to-sleep (* 1000
-                               (-
-                                3600
-                                (t/in-seconds
-                                 (t/interval @session-start-time
-                                             (t/now)))))]
+        (let [time-to-sleep (till-end-of-hour-millis)]
           (do (Thread/sleep time-to-sleep) ; sleep till the end of the
-                                          ; hour
-                                          ; and then restart the session
+                                        ; hour
+                                        ; and then restart the session
               (swap! session-start-time (fn [x] (t/now)))
               (swap! requests-in-session (fn [x] 1))
-              (make-request a-url)))))
+              (make-request a-url)))
+
+        ;; the clock ticked over
+        (not= (t/hour (t/now))
+              (t/hour @session-start-time))
+        (do (swap! session-start-time (fn [x] (t/now)))
+            (swap! requests-in-session (fn [x] 1))
+            (make-request a-url))
+
+        :else
+        (do (swap! requests-in-session inc)
+            (make-request a-url))))
 
 (defn write-content
   [start-epoch body]
@@ -141,7 +162,7 @@
   (let [credentials (load-credentials)
         formatter   (f/formatters :date-hour-minute-second)]
     (try
-     (<= (get-stop-for-start-epoch credentials (Long/parseLong start-epoch))
+      (<= (get-stop-for-start-epoch credentials (Long/parseLong start-epoch))
          (-> (f/parse formatter
                       (-> page-response last (get "createdAt")))
              c/to-long
@@ -162,51 +183,81 @@
 
 (defn discover-iteration
   [start-epoch first-page-content]
-  (let [next-pg-check (-> first-page-content
+  (let [credentials   (load-credentials)
+        next-pg-check (-> first-page-content
                           (get "cursor")
                           (get "hasNext"))]
-    (if next-pg-check
-      (let [cursor-value (-> first-page-content
-                             (get "cursor")
-                             (get "next"))
-
-            next-pg-url (create-url start-epoch
-                                    cursor-value)
-
-            next-pg-content (rate-limited-download next-pg-url)]
-        (write-content start-epoch next-pg-content)
-        (cond (nil? (last (get next-pg-content "response"))) ; if nil,
+    (cond  next-pg-check ; pagination exists
+           (let [cursor-value (-> first-page-content
+                                  (get "cursor")
+                                  (get "next"))
+                 
+                 next-pg-url (create-url start-epoch
+                                         cursor-value)
+                 
+                 next-pg-content (rate-limited-download next-pg-url)]
+             (write-content start-epoch next-pg-content)
+             (cond (nil? (last (get next-pg-content "response"))) ; if nil,
                                         ; even requerying was useless.
                                         ; so we reboot the crawl
-              (do (println :diagnostic-stop :nil-returned)
-                  (spit recovery-file
-                        (-> first-page-content
-                            (get "response")
-                            last
-                            (get "createdAt")
-                            process-disqus-date
-                            (str "\n"))
-                        :append
-                        true)
-                  (threads-since (-> first-page-content
-                                     (get "response")
-                                     last
-                                     (get "createdAt")
-                                     process-disqus-date
-                                     str)))
+                   (do (println :nil-returned :rebooting-crawl)
+                       (spit recovery-file
+                             (-> first-page-content
+                                 (get "response")
+                                 last
+                                 (get "createdAt")
+                                 process-disqus-date
+                                 (str "\n"))
+                             :append
+                             true)
+                       (threads-since (-> first-page-content
+                                          (get "response")
+                                          last
+                                          (get "createdAt")
+                                          process-disqus-date
+                                          str)))
 
-              (not
-               (stop-iteration? start-epoch (get next-pg-content "response")))
-              (recur start-epoch
-                     next-pg-content)))
-      (println :finished-iterating))))
+                   (not
+                    (stop-iteration? start-epoch (get next-pg-content "response")))
+                   (recur start-epoch
+                          next-pg-content)))
+
+           ;; disqus says pagination has ended but it clearly
+           ;; hasn't. Reboot the crawl here.
+           (and (not next-pg-check)
+                (<= (-> first-page-content
+                        (get "response")
+                        last
+                        (get "createdAt")
+                        process-disqus-date)
+                    (get-stop-for-start-epoch credentials (Long/parseLong start-epoch))))
+
+           ;; simply reboot the crawl here
+           (do (println :pagination-finished :crawl-not-finished)
+               (threads-since (-> first-page-content
+                                  (get "response")
+                                  last
+                                  (get "createdAt")
+                                  process-disqus-date
+                                  str)))
+
+           (and (not next-pg-check)
+                (> (-> first-page-content
+                       (get "response")
+                       last
+                       (get "createdAt")
+                       process-disqus-date)
+                   (get-stop-for-start-epoch credentials (Long/parseLong start-epoch))))
+           (println :pagination-finished :crawl-also-finished))))
 
 (defn threads-since
   [start-epoch]
   (let [request-url (create-url start-epoch)
         first-page  (rate-limited-download request-url)]
-    (write-content start-epoch first-page)
-    (discover-iteration start-epoch first-page)))
+    (if (nil? (get first-page "response"))
+      (println :motherfucker-returned-nil :threads-since start-epoch)
+      (do (write-content start-epoch first-page)
+          (discover-iteration start-epoch first-page)))))
 
 (defn get-last-written-file
   "There should be only 1 - newer files
@@ -233,7 +284,7 @@
                                                (catch Exception e nil)))))
 
         last-record (last records-stream)
-
+        
         formatter (f/formatters :date-hour-minute-second)]
     (threads-since
      (str
