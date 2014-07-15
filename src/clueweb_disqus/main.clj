@@ -7,7 +7,7 @@
             [clueweb-disqus.read-stats :as read-stats]
             [clueweb-disqus.recover :as recover]))
 
-(def options [["-b" "--reboot" "Reboot the crawl"]
+(def options [["-b" "--reboot" "Reboot the crawl by dumping restart points"]
               ["-r" "--recover TS" "Timestamp"]
               ["-s" "--stats" "Read stats"]
               ["-t" "--threads" "Dump a list of relevant thread-ids"]])
@@ -17,12 +17,12 @@
   (let [{options :options} (parse-opts args options)]
     (cond (:recover options)
           (core/threads-since (:recover options))
-
+          
           (:stats options)
           (read-stats/-main)
-
+          
           (:reboot options)
-          (recover/restart-to-recover-jobs)
+          (recover/dump-restart-points)
 
           (:threads options)
           (posts/dump-all-thread-ids core/disqus-jobs-dir))))
