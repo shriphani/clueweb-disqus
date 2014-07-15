@@ -69,7 +69,8 @@
 
 (defn get-stop-for-start-epoch
   [credentials since-epoch]
-  (or (-> credentials (get (str since-epoch)) :stop Long/parseLong)
+  (or (try (-> credentials (get (str since-epoch)) :stop Long/parseLong)
+           (catch Exception e nil))
       (let [orig-epochs (keys credentials)
             correct-key (str
                          (first
@@ -167,10 +168,10 @@
                       (-> page-response last (get "createdAt")))
              c/to-long
              (/ 1000)))
-     (catch Exception e (do (println (.getMessage e))
-                            (pprint (last page-response))
-                            (flush)
-                            true)))))              ; stop anyway
+      (catch Exception e (do (println (.getMessage e))
+                             (pprint (last page-response))
+                             (flush)
+                             true)))))              ; stop anyway
 
 (defn process-disqus-date
   [a-date]
