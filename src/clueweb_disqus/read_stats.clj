@@ -12,7 +12,10 @@
   []
   (let [stats-files (filter
                      (fn [f]
-                       (re-find #".stats$" (.getAbsolutePath f)))
+                       (and
+                        (not
+                         (re-find #"bkup" (.getAbsolutePath f)))
+                        (re-find #".stats$" (.getAbsolutePath f))))
                      (file-seq (java.io.File. core/disqus-jobs-dir)))]
     (reduce
      (fn [acc s]
@@ -23,9 +26,12 @@
 (defn generate-samples
   []
   (let [data-files (filter
-                     (fn [f]
-                       (re-find #".*-disqus-threads-.*.clj$" (.getAbsolutePath f)))
-                     (file-seq (java.io.File. core/disqus-jobs-dir)))]
+                    (fn [f]
+                      (and
+                       (not
+                        (re-find #"bkup" (.getAbsolutePath f)))
+                       (re-find #".*-disqus-threads-.*.clj$" (.getAbsolutePath f))))
+                    (file-seq (java.io.File. core/disqus-jobs-dir)))]
     (str
      "<html>"
      "<body>"
