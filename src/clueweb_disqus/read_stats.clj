@@ -63,9 +63,8 @@
              (compute-downloaded-records)
              "\n")
         :append true)
-  (do (let [data (read-dataset "disqus_stats.csv")
-            dates (sel data :cols 0)
-            cnt (sel data :cols 1)]
-        (save (time-series-plot dates cnt :y-label "Threads List Downloaded")
-              "/bos/www/htdocs/spalakod/disqus/disqus_thread_list.png"))
-      (spit "/bos/www/htdocs/spalakod/disqus/disqus_samples.html" (generate-samples))))
+  (let [data (read-dataset "disqus_stats.csv")
+        dates (sel data :cols 0)
+        cnt (sel data :cols 1)]
+    (save (time-series-plot dates cnt :y-label "Threads List Downloaded")
+          "/bos/www/htdocs/spalakod/disqus/disqus_thread_list.png")))
