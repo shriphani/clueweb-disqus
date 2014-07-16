@@ -147,10 +147,14 @@
   [start-epoch body]
   (let [content-to-write (get body "response")
         filename-to-write (str disqus-jobs-dir start-epoch "-" writer-file-name)
-        stats-f-to-write (str disqus-jobs-dir start-epoch "-" stats-file-name)]
-    (do (with-open [wrtr (io/writer filename-to-write :append true)]
-          (doall (doseq [c content-to-write]
-                   (pprint c wrtr))))
+        stats-f-to-write (str disqus-jobs-dir start-epoch "-" stats-file-name)
+        threads-file (clojure.string/replace filename-to-write #".clj$" ".threads")]
+    (do (with-open [wrtr (io/writer filename-to-write :append true)
+                    threads-wrtr (io/writer threads-file :append true)]
+          (doall
+           (doseq [c content-to-write]
+             (pprint c wrtr)
+             (println (get c "id") threads-wrtr))))
         (if (.exists (java.io.File. stats-f-to-write))
           (let [cnt
                 (+ (read-string (slurp stats-f-to-write))
