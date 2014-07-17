@@ -155,7 +155,8 @@
            (doseq [c content-to-write]
              (pprint c wrtr)
              (when (< 0 (get c "posts"))
-               (println (get c "id") threads-wrtr)))))
+               (binding [*out* threads-wrtr]
+                 (println (get c "id")))))))
         (if (.exists (java.io.File. stats-f-to-write))
           (let [cnt
                 (+ (read-string (slurp stats-f-to-write))
