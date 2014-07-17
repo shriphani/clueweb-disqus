@@ -93,6 +93,23 @@
           "&limit=100"
           (if cursor (str "&cursor=" cursor) ""))))
 
+(defn create-url-2
+  ([thread-ids api-key]
+     (create-url-2 thread-ids api-key nil))
+  ([thread-ids api-key cursor]
+     (str posts-endpoint
+          "?api_key="
+          api-key
+          (apply
+           str
+           (map
+            (fn [t]
+              (str "&thread=" t))
+            thread-ids))
+          "&order=asc"
+          "&limit=100"
+          (if cursor (str "&cursor=" cursor) ""))))
+
 (defn write-content
   [filename-to-write body]
   (let [content-to-write (get body "response")]
@@ -111,9 +128,9 @@
                              (get "cursor")
                              (get "next"))
             
-            next-pg-url (create-url thread-id
-                                    api-key
-                                    cursor-value)
+            next-pg-url (create-url-2 thread-id
+                                      api-key
+                                      cursor-value)
             
             next-pg-content (core/rate-limited-download next-pg-url)]
         (write-content filename-to-write
@@ -125,8 +142,8 @@
 (defn download-posts
   "Download all the posts for a single thread"
   [thread-id file-to-write api-key]
-  (let [url (create-url thread-id
-                        api-key)
+  (let [url (create-url-2 thread-id
+                          api-key)
         first-page-content (core/rate-limited-download url)]
     (write-content file-to-write first-page-content)
     (discover-iteration thread-id file-to-write first-page-content api-key)))
@@ -176,14 +193,7 @@
 
         deja-downloaded-file (string/replace thread-ids-file
                                              #".threads$"
-                                             ".downloaded")
-        
-        downloaded (if (.exists
-                        (io/as-file deja-downloaded-file))
-                     (set
-                      (string/split-lines
-                       (slurp deja-downloaded-file)))
-                     (set []))]
+                                             ".downloaded")]
     (if-not (.exists
              (io/as-file file-to-write))
       
@@ -194,12 +204,11 @@
                      (io/as-file file-to-write)))
           
           ;; kick off download
-          (let [thread-ids (filter
-                            (fn [t]
-                              (not
-                               (some #{t} downloaded)))
-                            (string/split-lines
-                             (slurp thread-ids-file)))]
+          (let [thread-ids
+                (partition
+                 300
+                 (string/split-lines
+                  (slurp thread-ids-file)))]
             (do (doseq [thread-id thread-ids]
                   (download-posts thread-id
                                   file-to-write
@@ -224,10 +233,10 @@
   []
   (let [threads-listing (str core/disqus-jobs-dir "all.threads")
         downloaded-listing (if (.exists
-                                (io/as-file "all.downloaded"))
+                                (io/as-file (str core/disqus-jobs-dir "all.downloaded")))
                             (set
                              (string/split-lines
-                              (slurp "all.downloaded")))
+                              (slurp (str core/disqus-jobs-dir "all.downloaded"))))
                             (set []))
         thread-stream (with-open [rdr (io/reader threads-listing)]
                         (doall
