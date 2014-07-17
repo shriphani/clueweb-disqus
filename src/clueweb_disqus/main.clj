@@ -10,7 +10,8 @@
 (def options [["-b" "--reboot" "Reboot the crawl by dumping restart points"]
               ["-r" "--recover TS" "Timestamp"]
               ["-s" "--stats" "Read stats"]
-              ["-t" "--threads" "Dump a list of relevant thread-ids"]])
+              ["-t" "--threads" "Dump a list of relevant thread-ids"]
+              ["-d" "--download-threads F" "Download a list of threads"]])
 
 (defn -main
   [& args]
@@ -25,4 +26,7 @@
           (recover/dump-restart-points)
 
           (:threads options)
-          (posts/dump-all-thread-ids core/disqus-jobs-dir))))
+          (posts/break-up-threads-list)
+
+          (:download-threads options)
+          (posts/download-posts-for-threads (:download-threads options)))))
