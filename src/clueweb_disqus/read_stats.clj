@@ -19,9 +19,17 @@
                      (file-seq (java.io.File. core/disqus-jobs-dir)))]
     (reduce
      (fn [acc s]
-       (+ acc (read-string (slurp s))))
+       (+ acc (try (read-string (slurp s))
+                   (catch Exception e 0))))
      0
      stats-files)))
+
+(defn compute-downloaded-posts
+  []
+  (let [all-downloaded (str core/disqus-jobs-dir "all.downloaded")]
+    (with-open [rdr (io/reader all-downloaded)]
+      (count
+       (line-seq rdr)))))
 
 (defn generate-samples
   []
@@ -63,8 +71,21 @@
              (compute-downloaded-records)
              "\n")
         :append true)
+  (spit "disqus_post_stats.csv"
+        (str (c/to-long
+              (t/now))
+             ", "
+             (compute-downloaded-posts)
+             "\n")
+        :append true)
   (let [data (read-dataset "disqus_stats.csv")
         dates (sel data :cols 0)
-        cnt (sel data :cols 1)]
+        cnt (sel data :cols 1)
+
+        posts-data (read-dataset "disqus_post_stats.csv")
+        posts-dates (sel data :cols 0)
+        posts-cnt (sel data :cols 1)]
     (save (time-series-plot dates cnt :y-label "Threads List Downloaded")
-          "/bos/www/htdocs/spalakod/disqus/disqus_thread_list.png")))
+          "/bos/www/htdocs/spalakod/disqus/disqus_thread_list.png")
+    (save (time-series-plot posts-dates posts-cnt :y-label "Threads List Downloaded")
+          "/bos/www/htdocs/spalakod/disqus/disqus_post_list.png")))
