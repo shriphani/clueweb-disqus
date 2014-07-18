@@ -193,7 +193,9 @@
 
         deja-downloaded-file (string/replace thread-ids-file
                                              #".threads$"
-                                             ".downloaded")]
+                                             ".downloaded")
+
+        deja-downloaded-wrtr (io/writer deja-downloaded-file :append true)]
     (if-not (.exists
              (io/as-file file-to-write))
       
@@ -214,18 +216,14 @@
                                   file-to-write
                                   (get-api-key-for-start-epoch
                                    credentials
-                                   (Long/parseLong associated-epoch))))
+                                   (Long/parseLong associated-epoch)))
+                  (binding [*out* deja-downloaded-wrtr]
+                    (println thread-id)
+                    (flush)))
 
                 ;; rename back the file
                 (.rename (io/as-file file-to-write)
-                         (io/as-file final-file))
-
-                ;; now record the download thread-ids
-                (with-open [wrtr (io/writer deja-downloaded-file :append true)]
-                  (doall
-                   (doseq [thread-id thread-ids]
-                     (binding [*out* wrtr]
-                       (println thread-id))))))))
+                         (io/as-file final-file)))))
 
       (println :crawl-in-progress))))
 
