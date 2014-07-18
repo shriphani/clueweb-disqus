@@ -218,8 +218,9 @@
                                    credentials
                                    (Long/parseLong associated-epoch)))
                   (binding [*out* deja-downloaded-wrtr]
-                    (println thread-id)
-                    (flush)))
+                    (doseq [t thread-id]
+                      (println t)
+                      (flush))))
 
                 ;; rename back the file
                 (.rename (io/as-file file-to-write)
