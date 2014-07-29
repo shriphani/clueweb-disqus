@@ -26,10 +26,20 @@
 
 (defn compute-downloaded-posts
   []
-  (let [all-downloaded (str core/disqus-jobs-dir "all.downloaded")]
-    (with-open [rdr (io/reader all-downloaded)]
-      (count
-       (line-seq rdr)))))
+  (let [downloaded-files (filter
+                          (fn [f]
+                            (and
+                             (not
+                              (re-find #"bkup" (.getAbsolutePath f)))
+                             (re-find #".downloaded$" (.getAbsolutePath f))))
+                          (file-seq (java.io.File. core/disqus-jobs-dir)))]
+    (reduce
+     (fn [acc f]
+      (with-open [rdr (io/reader f)]
+        (count
+         (line-seq rdr))))
+     0
+     downloaded-files)))
 
 (defn generate-samples
   []
@@ -83,8 +93,8 @@
         cnt (sel data :cols 1)
 
         posts-data (read-dataset "disqus_post_stats.csv")
-        posts-dates (sel data :cols 0)
-        posts-cnt (sel data :cols 1)]
+        posts-dates (sel posts-data :cols 0)
+        posts-cnt (sel posts-data :cols 1)]
     (save (time-series-plot dates cnt :y-label "Threads List Downloaded")
           "/bos/www/htdocs/spalakod/disqus/disqus_thread_list.png")
     (save (time-series-plot posts-dates posts-cnt :y-label "Threads List Downloaded")

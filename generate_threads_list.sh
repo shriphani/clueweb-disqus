@@ -8,5 +8,7 @@ cd $data_dir;
 cat *-disqus-threads*.threads | sort | uniq > all.threads
 cat *thread-ids*.downloaded | sort | uniq >> all.downloaded
 
+comm -23 all.threads all.downloaded > all.threads_to_download
+
 cd $script_home;
 lein trampoline run -t

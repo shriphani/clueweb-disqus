@@ -230,20 +230,11 @@
 
 (defn break-up-threads-list
   []
-  (let [threads-listing (str core/disqus-jobs-dir "all.threads")
-        downloaded-listing (if (.exists
-                                (io/as-file (str core/disqus-jobs-dir "all.downloaded")))
-                            (set
-                             (string/split-lines
-                              (slurp (str core/disqus-jobs-dir "all.downloaded"))))
-                            (set []))
-        thread-stream (with-open [rdr (io/reader threads-listing)]
-                        (doall
-                         (filter
-                          (fn [x]
-                           (not
-                            (some #{x} downloaded-listing)))
-                          (line-seq rdr))))
+  (let [threads-listing (str core/disqus-jobs-dir "all.threads_to_download")
+
+        threads-rdr (io/reader threads-listing)
+        
+        thread-stream (line-seq threads-rdr)
 
         num-threads (count thread-stream)
 
