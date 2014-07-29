@@ -202,8 +202,8 @@
       ;; rename existing file
       (do (when (.exists
                  (io/as-file final-file))
-            (.rename (io/as-file final-file)
-                     (io/as-file file-to-write)))
+            (.renameTo (io/as-file final-file)
+                       (io/as-file file-to-write)))
           
           ;; kick off download
           (let [thread-ids
@@ -223,8 +223,8 @@
                       (flush))))
 
                 ;; rename back the file
-                (.rename (io/as-file file-to-write)
-                         (io/as-file final-file)))))
+                (.renameTo (io/as-file file-to-write)
+                           (io/as-file final-file)))))
 
       (println :crawl-in-progress))))
 
