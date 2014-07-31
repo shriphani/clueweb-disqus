@@ -31,13 +31,17 @@
                             (and
                              (not
                               (re-find #"bkup" (.getAbsolutePath f)))
+                             (not
+                              (re-find #"all.downloaded" (.getAbsolutePath f)))
                              (re-find #".downloaded$" (.getAbsolutePath f))))
                           (file-seq (java.io.File. core/disqus-jobs-dir)))]
     (reduce
      (fn [acc f]
-      (with-open [rdr (io/reader f)]
-        (count
-         (line-seq rdr))))
+       (+
+        acc
+        (with-open [rdr (io/reader f)]
+          (count
+           (line-seq rdr)))))
      0
      downloaded-files)))
 
