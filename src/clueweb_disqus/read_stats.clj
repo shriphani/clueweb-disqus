@@ -4,6 +4,7 @@
   (:require [clj-time.core :as t]
             [clj-time.coerce :as c]
             [clojure.java.io :as io]
+            [clojure.set :as c-set]
             [clueweb-disqus.core :as core])
   (:use [clojure.pprint :only [pprint]]
         [incanter core stats charts io]))
@@ -35,15 +36,16 @@
                               (re-find #"all.downloaded" (.getAbsolutePath f)))
                              (re-find #".downloaded$" (.getAbsolutePath f))))
                           (file-seq (java.io.File. core/disqus-jobs-dir)))]
-    (reduce
-     (fn [acc f]
-       (+
-        acc
-        (with-open [rdr (io/reader f)]
-          (count
-           (line-seq rdr)))))
-     0
-     downloaded-files)))
+    (count
+     (doall
+      (reduce
+       (fn [acc f]
+         (c-set/union
+          acc
+          (with-open [rdr (io/reader f)]
+            (set (line-seq rdr)))))
+       (set [])
+       downloaded-files)))))
 
 (defn generate-samples
   []
