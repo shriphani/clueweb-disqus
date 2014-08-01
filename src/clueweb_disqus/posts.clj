@@ -177,7 +177,7 @@
   [thread-ids-file]
   (let [file-to-write (string/replace thread-ids-file
                                       #".threads$"
-                                      ".posts.lock")
+                                      ".posts")
 
         final-file (string/replace thread-ids-file
                                    #".threads$"
@@ -196,37 +196,23 @@
                                              ".downloaded")
 
         deja-downloaded-wrtr (io/writer deja-downloaded-file :append true)]
-    (if-not (.exists
-             (io/as-file file-to-write))
-      
-      ;; rename existing file
-      (do (when (.exists
-                 (io/as-file final-file))
-            (.renameTo (io/as-file final-file)
-                       (io/as-file file-to-write)))
-          
-          ;; kick off download
-          (let [thread-ids
-                (partition
-                 300
-                 (string/split-lines
-                  (slurp thread-ids-file)))]
-            (do (doseq [thread-id thread-ids]
-                  (download-posts thread-id
-                                  file-to-write
-                                  (get-api-key-for-start-epoch
-                                   credentials
-                                   (Long/parseLong associated-epoch)))
-                  (binding [*out* deja-downloaded-wrtr]
-                    (doseq [t thread-id]
-                      (println t)
-                      (flush))))
+    (do (let [thread-ids
+              (partition
+               300
+               (string/split-lines
+                (slurp thread-ids-file)))]
+          (do (doseq [thread-id thread-ids]
+                (download-posts thread-id
+                                file-to-write
+                                (get-api-key-for-start-epoch
+                                 credentials
+                                 (Long/parseLong associated-epoch)))
+                (binding [*out* deja-downloaded-wrtr]
+                  (doseq [t thread-id]
+                    (println t)
+                    (flush)))))))
 
-                ;; rename back the file
-                (.renameTo (io/as-file file-to-write)
-                           (io/as-file final-file)))))
-
-      (println :crawl-in-progress))))
+    (println :crawl-in-progress)))
 
 (defn break-up-threads-list
   []
