@@ -234,9 +234,7 @@
 
     (doseq [[k ts] keys-threads-stream]
       (with-open [wrtr (io/writer
-                        (str core/disqus-jobs-dir k "-thread-ids" ".threads")
-                        :append
-                        true)]
+                        (str core/disqus-jobs-dir k "-thread-ids" ".threads"))]
         (doall
          (doseq [t ts]
            (binding [*out* wrtr]
