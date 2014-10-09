@@ -9,5 +9,6 @@
                  [incanter "1.5.5"]
                  [me.raynes/fs "1.4.4"]
                  [org.clojure/clojure "1.6.0"]
-                 [org.clojure/tools.cli "0.3.1"]]
+                 [org.clojure/tools.cli "0.3.1"]
+                 [org.clueweb/clueweb-tools "0.3"]]
   :main clueweb-disqus.main)
